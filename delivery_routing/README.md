@@ -15,4 +15,3 @@ Shopify API Version: Uses the 2024-01 Admin API version with read_orders scope r
 The nearest-neighbour algorithm provides a fast, practical solution for small to medium-sized delivery routes while remaining simple to understand and maintain.
 
 https://claude.ai/code/session_017UNsyrZdkUjJxzePrA19wJ
-
