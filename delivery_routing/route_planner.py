@@ -2,7 +2,7 @@
 
 from math import atan2, cos, radians, sin, sqrt
 
-from delivery_routing.shopify_client import DeliveryAddress
+from delivery_routing.models import DeliveryAddress
 
 # Approximate radius of Earth in kilometres.
 _EARTH_RADIUS_KM = 6371.0
