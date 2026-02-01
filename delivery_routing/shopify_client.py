@@ -1,43 +1,19 @@
 """Shopify API client for extracting order and address information."""
 
 import os
-from dataclasses import dataclass
 
 import requests
 from dotenv import load_dotenv
+
+from delivery_routing.base_client import EcommercePlatformClient
+from delivery_routing.models import DeliveryAddress
 
 load_dotenv()
 
 API_VERSION = "2024-01"
 
 
-@dataclass
-class DeliveryAddress:
-    """A delivery address extracted from a Shopify order."""
-
-    order_id: int
-    order_name: str
-    name: str
-    address1: str
-    address2: str
-    city: str
-    province: str
-    country: str
-    zip_code: str
-    phone: str
-    latitude: float | None = None
-    longitude: float | None = None
-
-    @property
-    def full_address(self) -> str:
-        parts = [self.address1]
-        if self.address2:
-            parts.append(self.address2)
-        parts.extend([self.city, self.province, self.zip_code, self.country])
-        return ", ".join(p for p in parts if p)
-
-
-class ShopifyClient:
+class ShopifyClient(EcommercePlatformClient):
     """Client for the Shopify Admin REST API."""
 
     def __init__(
@@ -113,7 +89,7 @@ class ShopifyClient:
 
             addresses.append(
                 DeliveryAddress(
-                    order_id=order["id"],
+                    order_id=str(order["id"]),
                     order_name=order.get("name", ""),
                     name=f'{shipping.get("first_name", "")} {shipping.get("last_name", "")}'.strip(),
                     address1=shipping.get("address1", ""),

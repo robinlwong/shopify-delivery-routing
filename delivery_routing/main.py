@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""CLI entry point for the Shopify delivery route planner."""
+"""CLI entry point for the e-commerce delivery route planner."""
 
 import argparse
 import csv
 import sys
 
-from delivery_routing.shopify_client import ShopifyClient
+from delivery_routing.base_client import EcommercePlatformClient
 from delivery_routing.route_planner import nearest_neighbour_route, total_route_distance
 
 
@@ -45,9 +45,63 @@ def _export_csv(addresses, path):
     print(f"Route exported to {path}")
 
 
+def _build_client(args) -> EcommercePlatformClient:
+    """Instantiate the correct platform client based on CLI arguments.
+
+    Args:
+        args: Parsed argparse namespace.
+
+    Returns:
+        An EcommercePlatformClient instance for the chosen platform.
+    """
+    platform = args.platform.lower()
+
+    if platform == "shopify":
+        from delivery_routing.shopify_client import ShopifyClient
+        return ShopifyClient(
+            store_url=args.store_url,
+            access_token=args.access_token,
+        )
+
+    if platform == "shopee":
+        from delivery_routing.shopee_client import ShopeeClient
+        return ShopeeClient(
+            partner_id=args.partner_id,
+            partner_key=args.partner_key,
+            shop_id=args.shop_id,
+            access_token=args.access_token,
+        )
+
+    if platform == "lazada":
+        from delivery_routing.lazada_client import LazadaClient
+        return LazadaClient(
+            app_key=args.app_key,
+            app_secret=args.app_secret,
+            access_token=args.access_token,
+            region=args.region,
+        )
+
+    if platform == "tiktok":
+        from delivery_routing.tiktok_client import TikTokClient
+        return TikTokClient(
+            app_key=args.app_key,
+            app_secret=args.app_secret,
+            access_token=args.access_token,
+            shop_id=args.shop_id,
+        )
+
+    raise ValueError(f"Unsupported platform: {platform}")
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Extract Shopify delivery addresses and plan a route.",
+        description="Extract delivery addresses from e-commerce orders and plan a route.",
+    )
+    parser.add_argument(
+        "--platform",
+        default="shopify",
+        choices=["shopify", "shopee", "lazada", "tiktok"],
+        help='E-commerce platform to fetch orders from (default: "shopify").',
     )
     parser.add_argument(
         "--status",
@@ -59,26 +113,66 @@ def main():
         metavar="FILE",
         help="Export the planned route to a CSV file.",
     )
+
+    # Shared credential argument.
     parser.add_argument(
+        "--access-token",
+        help="API access token (overrides platform-specific env var).",
+    )
+
+    # Shopify-specific arguments.
+    shopify_group = parser.add_argument_group("Shopify options")
+    shopify_group.add_argument(
         "--store-url",
         help="Shopify store URL (overrides SHOPIFY_STORE_URL env var).",
     )
-    parser.add_argument(
-        "--access-token",
-        help="Shopify access token (overrides SHOPIFY_ACCESS_TOKEN env var).",
+
+    # Shopee-specific arguments.
+    shopee_group = parser.add_argument_group("Shopee options")
+    shopee_group.add_argument(
+        "--partner-id",
+        help="Shopee partner ID (overrides SHOPEE_PARTNER_ID env var).",
     )
+    shopee_group.add_argument(
+        "--partner-key",
+        help="Shopee partner key (overrides SHOPEE_PARTNER_KEY env var).",
+    )
+
+    # Lazada-specific arguments.
+    lazada_group = parser.add_argument_group("Lazada options")
+    lazada_group.add_argument(
+        "--region",
+        help="Lazada region code: sg, my, th, ph, id, vn (overrides LAZADA_REGION env var).",
+    )
+
+    # Shared arguments used by multiple platforms.
+    shared_group = parser.add_argument_group("Shopee / Lazada / TikTok options")
+    shared_group.add_argument(
+        "--app-key",
+        help="App key for Lazada or TikTok (overrides platform-specific env var).",
+    )
+    shared_group.add_argument(
+        "--app-secret",
+        help="App secret for Lazada or TikTok (overrides platform-specific env var).",
+    )
+    shared_group.add_argument(
+        "--shop-id",
+        help="Shop ID for Shopee or TikTok (overrides platform-specific env var).",
+    )
+
     args = parser.parse_args()
 
     try:
-        client = ShopifyClient(
-            store_url=args.store_url,
-            access_token=args.access_token,
-        )
+        client = _build_client(args)
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    print("Fetching orders from Shopify...")
+    platform_name = args.platform.capitalize()
+    if args.platform == "tiktok":
+        platform_name = "TikTok Shop"
+
+    print(f"Fetching orders from {platform_name}...")
     addresses = client.extract_delivery_addresses(status=args.status)
 
     if not addresses:
